@@ -480,18 +480,19 @@ static void sdl_display_dimensions(int &width, int &height)
 	height = desktop_mode.h;
 }
 
+// A display of no size (SDL's offscreen driver, used for scripted runs) counts as 1024x768.
 static inline int sdl_display_width(void)
 {
 	int width, height;
 	sdl_display_dimensions(width, height);
-	return width;
+	return width > 0 ? width : 1024;
 }
 
 static inline int sdl_display_height(void)
 {
 	int width, height;
 	sdl_display_dimensions(width, height);
-	return height;
+	return height > 0 ? height : 768;
 }
 
 // Check whether specified mode is available
@@ -734,7 +735,7 @@ static SDL_Surface *init_sdl_video(int width, int height, int depth, Uint32 flag
 	if (flags & SDL_WINDOW_FULLSCREEN) {
 		SDL_DisplayMode desktop_mode;
 		if (SDL_GetDesktopDisplayMode(0, &desktop_mode) != 0) {
-			shutdown_sdl_video();
+			fprintf(stderr, "init_sdl_video line %d: %s\n", __LINE__, SDL_GetError()); shutdown_sdl_video();
 			return NULL;
 		}
 		window_flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
@@ -758,7 +759,9 @@ static SDL_Surface *init_sdl_video(int width, int height, int depth, Uint32 flag
 	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, PrefsFindBool("scale_nearest") ? "nearest" : "linear");
 	
 #if defined(__MACOSX__) && SDL_VERSION_ATLEAST(2,0,14)
-	if (MetalIsAvailable()) window_flags |= SDL_WINDOW_METAL;
+	// SDL's offscreen driver (scripted runs) has neither Metal nor OpenGL: its software renderer.
+	const bool offscreen = SDL_GetCurrentVideoDriver() && !strcmp(SDL_GetCurrentVideoDriver(), "offscreen");
+	if (MetalIsAvailable() && !offscreen) window_flags |= SDL_WINDOW_METAL;
 #endif
 	
 	if (!sdl_window) {
@@ -771,7 +774,7 @@ static SDL_Surface *init_sdl_video(int width, int height, int depth, Uint32 flag
 			m * window_height,
 			window_flags);
 		if (!sdl_window) {
-			shutdown_sdl_video();
+			fprintf(stderr, "init_sdl_video line %d: %s\n", __LINE__, SDL_GetError()); shutdown_sdl_video();
 			return NULL;
 		}
 		set_window_name();
@@ -795,7 +798,7 @@ static SDL_Surface *init_sdl_video(int width, int height, int depth, Uint32 flag
 #ifdef WIN32
 			SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
 #elif defined(__MACOSX__) && SDL_VERSION_ATLEAST(2,0,14)
-			SDL_SetHint(SDL_HINT_RENDER_DRIVER, window_flags & SDL_WINDOW_METAL ? "metal" : "opengl");
+			SDL_SetHint(SDL_HINT_RENDER_DRIVER, offscreen ? "software" : window_flags & SDL_WINDOW_METAL ? "metal" : "opengl");
 #else
 			SDL_SetHint(SDL_HINT_RENDER_DRIVER, "");
 #endif
@@ -809,7 +812,7 @@ static SDL_Surface *init_sdl_video(int width, int height, int depth, Uint32 flag
 		sdl_renderer = SDL_CreateRenderer(sdl_window, -1, 0);
 
 		if (!sdl_renderer) {
-			shutdown_sdl_video();
+			fprintf(stderr, "init_sdl_video line %d: %s\n", __LINE__, SDL_GetError()); shutdown_sdl_video();
 			return NULL;
 		}
 		sdl_renderer_thread_id = SDL_ThreadID();
@@ -831,7 +834,7 @@ static SDL_Surface *init_sdl_video(int width, int height, int depth, Uint32 flag
 	sdl_texture = SDL_CreateTexture(sdl_renderer, SDL_PIXELFORMAT_BGRA8888, SDL_TEXTUREACCESS_STREAMING, width, height);
 #endif
     if (!sdl_texture) {
-        shutdown_sdl_video();
+        fprintf(stderr, "init_sdl_video line %d: %s\n", __LINE__, SDL_GetError()); shutdown_sdl_video();
         return NULL;
     }
     sdl_update_video_rect.x = 0;
@@ -870,7 +873,7 @@ static SDL_Surface *init_sdl_video(int width, int height, int depth, Uint32 flag
             break;
     }
     if (!guest_surface) {
-        shutdown_sdl_video();
+        fprintf(stderr, "init_sdl_video line %d: %s\n", __LINE__, SDL_GetError()); shutdown_sdl_video();
         return NULL;
     }
 
@@ -878,7 +881,7 @@ static SDL_Surface *init_sdl_video(int width, int height, int depth, Uint32 flag
     	Uint32 texture_format;
     	if (SDL_QueryTexture(sdl_texture, &texture_format, NULL, NULL, NULL) != 0) {
     		printf("ERROR: Unable to get the SDL texture's pixel format: %s\n", SDL_GetError());
-    		shutdown_sdl_video();
+    		fprintf(stderr, "init_sdl_video line %d: %s\n", __LINE__, SDL_GetError()); shutdown_sdl_video();
     		return NULL;
     	}
 
@@ -886,14 +889,14 @@ static SDL_Surface *init_sdl_video(int width, int height, int depth, Uint32 flag
     	Uint32 Rmask, Gmask, Bmask, Amask;
     	if (!SDL_PixelFormatEnumToMasks(texture_format, &bpp, &Rmask, &Gmask, &Bmask, &Amask)) {
     		printf("ERROR: Unable to determine format for host SDL_surface: %s\n", SDL_GetError());
-    		shutdown_sdl_video();
+    		fprintf(stderr, "init_sdl_video line %d: %s\n", __LINE__, SDL_GetError()); shutdown_sdl_video();
     		return NULL;
     	}
 
         host_surface = SDL_CreateRGBSurface(0, width, height, bpp, Rmask, Gmask, Bmask, Amask);
         if (!host_surface) {
         	printf("ERROR: Unable to create host SDL_surface: %s\n", SDL_GetError());
-            shutdown_sdl_video();
+            fprintf(stderr, "init_sdl_video line %d: %s\n", __LINE__, SDL_GetError()); shutdown_sdl_video();
             return NULL;
         }
     }
@@ -901,7 +904,7 @@ static SDL_Surface *init_sdl_video(int width, int height, int depth, Uint32 flag
 	if (SDL_RenderSetLogicalSize(sdl_renderer, width, height) != 0) {
 		printf("ERROR: Unable to set SDL rendeer's logical size (to %dx%d): %s\n",
 			   width, height, SDL_GetError());
-		shutdown_sdl_video();
+		fprintf(stderr, "init_sdl_video line %d: %s\n", __LINE__, SDL_GetError()); shutdown_sdl_video();
 		return NULL;
 	}
 
@@ -910,8 +913,63 @@ static SDL_Surface *init_sdl_video(int width, int height, int depth, Uint32 flag
     return guest_surface;
 }
 
+
+#ifndef __ANDROID__
+/*
+ *  Debugging hooks for driving the Mac from a script (carmen-mac branch):
+ *  SS_DUMP=path   the Mac's screen is saved there as BMP about once a second
+ *                 (written to path.tmp, then renamed);
+ *  SS_INPUT=path  a FIFO of lines: "move X Y", "down", "up", "key CODE"
+ *                 (a Mac key code, pressed and released), "keydown CODE",
+ *                 "keyup CODE".
+ */
+#include <stdio.h>
+#include <pthread.h>
+#include <unistd.h>
+static void *ss_input_func(void *arg)
+{
+	const char *path = (const char *)arg;
+	for (;;) {
+		FILE *f = fopen(path, "r");
+		if (!f) { sleep(1); continue; }
+		char line[128];
+		while (fgets(line, sizeof(line), f)) {
+			int a = 0, b = 0;
+			if (sscanf(line, "move %d %d", &a, &b) == 2) ADBMouseMoved(a, b);
+			else if (!strncmp(line, "down", 4)) ADBMouseDown(0);
+			else if (!strncmp(line, "up", 2)) ADBMouseUp(0);
+			else if (sscanf(line, "keydown %d", &a) == 1) ADBKeyDown(a);
+			else if (sscanf(line, "keyup %d", &a) == 1) ADBKeyUp(a);
+			else if (sscanf(line, "key %d", &a) == 1) { ADBKeyDown(a); usleep(80000); ADBKeyUp(a); }
+		}
+		fclose(f);
+	}
+	return NULL;
+}
+
+static void ss_debug_hooks(SDL_Surface *surface)
+{
+	static bool started;
+	if (!started) {
+		started = true;
+		const char *in = getenv("SS_INPUT");
+		if (in) { pthread_t t; pthread_create(&t, NULL, ss_input_func, (void *)in); pthread_detach(t); }
+	}
+	const char *dump = getenv("SS_DUMP");
+	static Uint32 last;
+	if (dump && surface && SDL_GetTicks() - last >= 1000) {
+		last = SDL_GetTicks();
+		std::string tmp = std::string(dump) + ".tmp";
+		if (SDL_SaveBMP(surface, tmp.c_str()) == 0) rename(tmp.c_str(), dump);
+	}
+}
+#endif
+
 static int present_sdl_video()
 {
+#ifndef __ANDROID__
+	ss_debug_hooks(guest_surface);
+#endif
 	if (SDL_RectEmpty(&sdl_update_video_rect)) return 0;
 	
 	if (!sdl_renderer || !sdl_texture || !guest_surface) {
@@ -1414,11 +1472,11 @@ bool VideoInit(bool classic)
 
 	// Create Mutexes
 	if ((sdl_events_lock = SDL_CreateMutex()) == NULL)
-		return false;
+		{ fprintf(stderr, "VideoInit failed at 1: %s\n", SDL_GetError()); return false; }
 	if ((sdl_palette_lock = SDL_CreateMutex()) == NULL)
-		return false;
+		{ fprintf(stderr, "VideoInit failed at 2: %s\n", SDL_GetError()); return false; }
 	if ((frame_buffer_lock = SDL_CreateMutex()) == NULL)
-		return false;
+		{ fprintf(stderr, "VideoInit failed at 3: %s\n", SDL_GetError()); return false; }
 
 	// Init keycode translation
 	keycode_init();
@@ -1547,7 +1605,7 @@ bool VideoInit(bool classic)
 
 	if (VideoModes.empty()) {
 		ErrorAlert(STR_NO_XVISUAL_ERR);
-		return false;
+		{ fprintf(stderr, "VideoInit failed at 4: %s\n", SDL_GetError()); return false; }
 	}
 
 	// Find requested default mode with specified dimensions
@@ -1606,7 +1664,9 @@ bool VideoInit(bool classic)
 	VideoMonitors.push_back(monitor);
 
 	// Open display
-	return monitor->video_open();
+	bool opened = monitor->video_open();
+	if (!opened) fprintf(stderr, "video_open failed: %s\n", SDL_GetError());
+	return opened;
 }
 
 

@@ -1,3 +1,4 @@
+#include <stdio.h>
 /*
  *  main.cpp - ROM patches
  *
@@ -124,7 +125,7 @@ bool InitAll(const char *vmdir)
 
 	// Init thunks
 	if (!ThunksInit())
-		return false;
+		{ fprintf(stderr, "InitAll failed at 1\n", 1); return false; }
 
 	// Init drivers
 	SonyInit();
@@ -155,12 +156,12 @@ bool InitAll(const char *vmdir)
 
 	// Init video
 	if (!VideoInit())
-		return false;
+		{ fprintf(stderr, "InitAll failed at 2\n", 2); return false; }
 
 	// Install ROM patches
 	if (!PatchROM()) {
 		ErrorAlert(GetString(STR_UNSUPPORTED_ROM_TYPE_ERR));
-		return false;
+		{ fprintf(stderr, "InitAll failed at 3\n", 3); return false; }
 	}
 
 	// Initialize Kernel Data
