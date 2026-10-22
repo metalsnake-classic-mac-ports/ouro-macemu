@@ -960,7 +960,10 @@ static void ss_debug_hooks(SDL_Surface *surface)
 	if (dump && surface && SDL_GetTicks() - last >= 1000) {
 		last = SDL_GetTicks();
 		std::string tmp = std::string(dump) + ".tmp";
-		if (SDL_SaveBMP(surface, tmp.c_str()) == 0) rename(tmp.c_str(), dump);
+		// 16-bit surfaces do not save as BMP; those are converted to 24-bit first.
+		SDL_Surface *out = surface->format->BitsPerPixel == 16 ? SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGB24, 0) : surface;
+		if (out && SDL_SaveBMP(out, tmp.c_str()) == 0) rename(tmp.c_str(), dump);
+		if (out && out != surface) SDL_FreeSurface(out);
 	}
 }
 #endif

@@ -301,11 +301,31 @@ static int16 set_gamma(VidLocals *csSave, uint32 gamma)
 	return noErr;
 }
 
+static int16 VideoControlImpl(uint32 pb, VidLocals *csSave);
 static int16 VideoControl(uint32 pb, VidLocals *csSave)
+{
+	int16 r = VideoControlImpl(pb, csSave);
+	if (getenv("SS_TRACE_VIDEO") && r) fprintf(stderr, "[video] %ld control %d -> %d\n", (long)time(NULL), ReadMacInt16(pb + csCode), r);
+	return r;
+}
+
+static int16 VideoControlImpl(uint32 pb, VidLocals *csSave)
 {
 	int16 code = ReadMacInt16(pb + csCode);
 	D(bug("VideoControl %d: ", code));
 	uint32 param = ReadMacInt32(pb + csParam);
+	static int trace = -1;
+	if (trace < 0) trace = getenv("SS_TRACE_VIDEO") != NULL;
+	if (trace) {
+		if (code == cscSetEntries && param) {
+			uint32 t = ReadMacInt32(param + csTable);
+			int16 st = ReadMacInt16(param + csStart), n = ReadMacInt16(param + csCount);
+			fprintf(stderr, "[video] %ld SetEntries start %d count %d mode %d", (long)time(NULL), st, n, VModes[cur_mode].viAppleMode);
+			if (t) for (int i = 0; i <= n && i < 3; i++) fprintf(stderr, " %d=%04x%04x%04x", ReadMacInt16(t + 8*i), ReadMacInt16(t + 8*i + 2), ReadMacInt16(t + 8*i + 4), ReadMacInt16(t + 8*i + 6));
+			fprintf(stderr, " gamma %08x lum %d\n", csSave->gammaTable, csSave->luminanceMapping);
+		} else if (code != cscSetHardwareCursor && code != cscDrawHardwareCursor)
+			fprintf(stderr, "[video] %ld control %d\n", (long)time(NULL), code);
+	}
 	switch (code) {
 
 		case cscReset:									// VidReset
@@ -657,7 +677,17 @@ static void get_size_of_resolution(int id, uint32 &x, uint32 &y)
 	x = y = 0;
 }
 
+static int16 VideoStatusImpl(uint32 pb, VidLocals *csSave);
 static int16 VideoStatus(uint32 pb, VidLocals *csSave)
+{
+	static int trace = -1;
+	if (trace < 0) trace = getenv("SS_TRACE_VIDEO") != NULL;
+	int16 r = VideoStatusImpl(pb, csSave);
+	if (trace) fprintf(stderr, "[video] %ld status %d -> %d mode %d\n", (long)time(NULL), ReadMacInt16(pb + csCode), r, VModes[cur_mode].viAppleMode);
+	return r;
+}
+
+static int16 VideoStatusImpl(uint32 pb, VidLocals *csSave)
 {
 	int16 code = ReadMacInt16(pb + csCode);
 	D(bug("VideoStatus %d: ", code));
