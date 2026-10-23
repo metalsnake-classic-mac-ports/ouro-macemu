@@ -48,6 +48,7 @@ prefs_desc common_prefs_items[] = {
 	{"ramsize", TYPE_INT32, false,      "size of Mac RAM in bytes"},
 	{"frameskip", TYPE_INT32, false,    "number of frames to skip in refreshed video modes"},
 	{"gfxaccel", TYPE_BOOLEAN, false,   "turn on QuickDraw acceleration"},
+	{"singlemode", TYPE_BOOLEAN, false, "offer the Mac only the screen size given (Mac OS picked 1024x768 when 1920x1080 was one of several)"},
 	{"nocdrom", TYPE_BOOLEAN, false,    "don't install CD-ROM driver"},
 	{"nonet", TYPE_BOOLEAN, false,      "don't use Ethernet"},
 	{"nosound", TYPE_BOOLEAN, false,    "don't enable sound output"},
