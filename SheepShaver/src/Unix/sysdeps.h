@@ -371,6 +371,17 @@ static inline int testandset(volatile int *p)
 }
 #endif
 
+// arm64 had none, so spin_lock did nothing: the CPU's spcflags and
+// InterruptFlags were changed from two threads unlocked, and a lost update
+// could bring back a cleared SPCFLAG_CPU_EXEC_RETURN, ending emul_ppc.
+#if defined(__aarch64__) || defined(__arm64__)
+#define HAVE_TEST_AND_SET 1
+static inline int testandset(volatile int *p)
+{
+	return __atomic_exchange_n(p, 1, __ATOMIC_ACQUIRE);
+}
+#endif
+
 #endif /* __GNUC__ */
 
 typedef volatile int spinlock_t;
@@ -387,7 +398,12 @@ static inline void spin_lock(spinlock_t *lock)
 
 static inline void spin_unlock(spinlock_t *lock)
 {
+#ifdef __GNUC__
+	// A release store: arm64 may otherwise make the unlock visible before the writes it guards.
+	__atomic_store_n(lock, 0, __ATOMIC_RELEASE);
+#else
 	*lock = 0;
+#endif
 }
 
 static inline int spin_trylock(spinlock_t *lock)
