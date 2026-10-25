@@ -956,8 +956,14 @@ static void ss_debug_hooks(SDL_Surface *surface)
 		if (in) { pthread_t t; pthread_create(&t, NULL, ss_input_func, (void *)in); pthread_detach(t); }
 	}
 	const char *dump = getenv("SS_DUMP");
-	static Uint32 last;
-	if (dump && surface && SDL_GetTicks() - last >= 1000) {
+	// SS_DUMP_MS: milliseconds between dumps, 1000 when unset. A script that
+	// reads what the pointer is over needs the screen sooner than a second on.
+	static Uint32 last, every;
+	if (!every) {
+		const char *ms = getenv("SS_DUMP_MS");
+		every = ms && atoi(ms) > 0 ? atoi(ms) : 1000;
+	}
+	if (dump && surface && SDL_GetTicks() - last >= every) {
 		last = SDL_GetTicks();
 		std::string tmp = std::string(dump) + ".tmp";
 		// 16-bit surfaces do not save as BMP; those are converted to 24-bit first.
