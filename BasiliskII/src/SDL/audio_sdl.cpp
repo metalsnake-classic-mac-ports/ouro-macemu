@@ -76,9 +76,18 @@ static bool open_sdl_audio(void)
 {
 	// SDL supports a variety of twisted little audio formats, all different
 	if (audio_sample_sizes.empty()) {
-		audio_sample_rates.push_back(11025 << 16);
-		audio_sample_rates.push_back(22050 << 16);
-		audio_sample_rates.push_back(44100 << 16);
+		// SS_SOUND_RATE (macOS scripted runs): offer the Mac this one rate.
+		// On arm64 the PowerPC is interpreted, and QuickTime's music
+		// synthesizer at 44100 Hz stereo falls behind the host clock its
+		// notes are timed by, so a recording at a lower rate keeps time.
+		const char *only_rate = getenv("SS_SOUND_RATE");
+		if (only_rate && atoi(only_rate) > 0)
+			audio_sample_rates.push_back(atoi(only_rate) << 16);
+		else {
+			audio_sample_rates.push_back(11025 << 16);
+			audio_sample_rates.push_back(22050 << 16);
+			audio_sample_rates.push_back(44100 << 16);
+		}
 		audio_sample_sizes.push_back(8);
 		audio_sample_sizes.push_back(16);
 		audio_channel_counts.push_back(1);
@@ -225,6 +234,31 @@ void audio_exit_stream()
  *  Streaming function
  */
 
+// SS_SOUND_FILE (macOS scripted runs): the Mac's sound output is written
+// there, raw, in the format the device was opened with, and the device is
+// given silence. The sound card's clock sets the pace, which keeps the samples
+// in step with the host clock that QuickTime times its notes by; SDL's disk
+// driver sleeps a buffer's length after each fill, so its files ran a quarter
+// fast. What is written is the Mac mixer's buffer before the Mac's volume is
+// applied, with a short buffer and every silent one padded to the stream's
+// length, so the file's timeline is the device's.
+static FILE *sound_file;
+static bool sound_file_tried;
+static void sound_file_write(const uint8 *data, int len, int stream_len)
+{
+	if (!sound_file_tried) {
+		sound_file_tried = true;
+		const char *path = getenv("SS_SOUND_FILE");
+		if (path && *path) sound_file = fopen(path, "wb");
+	}
+	if (!sound_file) return;
+	if (len > 0) fwrite(data, 1, len, sound_file);
+	static uint8 zeros[16384];
+	for (int pad = stream_len - (len > 0 ? len : 0); pad > 0; pad -= sizeof(zeros))
+		fwrite(zeros, 1, pad < (int)sizeof(zeros) ? pad : sizeof(zeros), sound_file);
+	fflush(sound_file);
+}
+
 static void stream_func(void *arg, uint8 *stream, int stream_len)
 {
 	if (AudioStatus.num_sources) {
@@ -256,7 +290,9 @@ static void stream_func(void *arg, uint8 *stream, int stream_len)
 					audio_mix_buf[i] = audio_mix_buf[i + 1] = src[i >> 1];
 			else memcpy(audio_mix_buf, src, work_size);
 			memset((uint8 *)stream, silence_byte, stream_len);
-			SDL_MixAudio(stream, audio_mix_buf, work_size, get_audio_volume());
+			sound_file_write(audio_mix_buf, work_size, stream_len);
+			if (!sound_file)
+				SDL_MixAudio(stream, audio_mix_buf, work_size, get_audio_volume());
 
 			D(bug("stream: data written\n"));
 
@@ -267,6 +303,7 @@ static void stream_func(void *arg, uint8 *stream, int stream_len)
 
 		// Audio not active, play silence
 		silence: memset(stream, silence_byte, stream_len);
+		sound_file_write(NULL, 0, stream_len);
 	}
 	
 #if defined(BINCUE)
