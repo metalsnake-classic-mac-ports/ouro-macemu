@@ -277,6 +277,12 @@ static int32 AudioSetInfo(uint32 infoPtr, uint32 selector, uint32 sourceID)
 int32 AudioDispatch(uint32 params, uint32 globals)
 {
 	D(bug("AudioDispatch params %08lx (size %d), what %d\n", params, ReadMacInt8(params + cp_paramSize), (int16)ReadMacInt16(params + cp_what)));
+	// S.C.Out measurement: show that the Sound Manager uses the audio component
+	if (getenv("SCOUT_FPS")) {
+		static int calls = 0;
+		if (calls++ < 20)
+			fprintf(stderr, "scout: audio component call %d\n", (int16)ReadMacInt16(params + cp_what));
+	}
 	M68kRegisters r;
 	uint32 p = params + cp_params;
 	int16 selector = (int16)ReadMacInt16(params + cp_what);

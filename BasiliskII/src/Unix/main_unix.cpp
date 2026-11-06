@@ -219,6 +219,10 @@ static const char *gui_connection_path = NULL;	// GUI connection identifier
 static void *xpram_func(void *arg);
 static void *tick_func(void *arg);
 static void one_tick(...);
+static void *scout_fps_func(void *arg);
+static pthread_t scout_thread;
+static bool scout_thread_active = false;
+static volatile bool scout_thread_cancel = false;
 #if !EMULATED_68K
 static void sigirq_handler(int sig, int code, struct sigcontext *scp);
 static void sigill_handler(int sig, int code, struct sigcontext *scp);
@@ -883,6 +887,10 @@ int main(int argc, char **argv)
 	sigaction(SIGINT, &sigint_sa, NULL);
 #endif
 
+	// S.C.Out speed measurement (env SCOUT_FPS)
+	if (getenv("SCOUT_FPS"))
+		scout_thread_active = pthread_create(&scout_thread, NULL, scout_fps_func, NULL) == 0;
+
 #ifndef USE_CPU_EMUL_SERVICES
 #if defined(HAVE_PTHREADS)
 
@@ -972,6 +980,13 @@ int main(int argc, char **argv)
 void QuitEmulator(void)
 {
 	D(bug("QuitEmulator\n"));
+
+	// Stop the S.C.Out measurement before the Mac memory goes away
+	if (scout_thread_active) {
+		scout_thread_cancel = true;
+		pthread_join(scout_thread, NULL);
+		scout_thread_active = false;
+	}
 
 #if EMULATED_68K
 	// Exit 680x0 emulation
@@ -1304,6 +1319,43 @@ static void one_second(void)
 		xpram_watchdog();
 	}
 #endif
+}
+
+/*
+ *  S.C.Out speed measurement: samples the game's frame counter (A5-0x6d08,
+ *  changes every game frame) and the Mac Ticks every millisecond and prints
+ *  game frames and delivered 60 Hz ticks per second to stderr.
+ */
+
+static void *scout_fps_func(void *arg)
+{
+	uint32 last_counter = 0xffffffff, frames = 0;
+	uint32 ticks_start = 0;
+	uint64 start = GetTicks_usec();
+	while (!scout_thread_cancel) {
+		Delay_usec(1000);
+		if (scout_thread_cancel || !HasMacStarted())
+			continue;
+		uint32 a5 = ReadMacInt32(0x904);
+		if (a5 > 0x7000 && a5 < RAMSize) {
+			uint32 counter = ReadMacInt32(a5 - 0x6d08);
+			if (counter != last_counter) {
+				frames++;
+				last_counter = counter;
+			}
+		}
+		uint64 now = GetTicks_usec();
+		if (now - start >= 1000000) {
+			uint32 ticks = ReadMacInt32(0x16a);
+			fprintf(stderr, "scout: %u game frames, %u Mac ticks in %.3f s, [0x64] = %08x\n",
+				frames, ticks_start ? ticks - ticks_start : 0, (now - start) / 1e6,
+				ReadMacInt32(0x64));
+			frames = 0;
+			ticks_start = ticks;
+			start = now;
+		}
+	}
+	return NULL;
 }
 
 static void one_tick(...)
