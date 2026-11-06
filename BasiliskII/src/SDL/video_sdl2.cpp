@@ -71,6 +71,15 @@
 #include "vm_alloc.h"
 #include "cdrom.h"
 
+// Emulator monitor (RandoOnSteam): scripts drive the Mac over TCP on
+// 127.0.0.1 when EMULATOR_MONITOR_PORT is set.
+#if !defined(__ANDROID__) && !defined(ENABLE_EMULATOR_MONITOR)
+#define ENABLE_EMULATOR_MONITOR 1
+#endif
+#ifdef ENABLE_EMULATOR_MONITOR
+#include "emulator_monitor.h"
+#endif
+
 #define DEBUG 0
 #include "debug.h"
 
@@ -652,6 +661,9 @@ public:
 
 	bool init_ok;	// Initialization succeeded (we can't use exceptions because of -fomit-frame-pointer)
 	SDL_Surface *s;	// The surface we draw into
+#ifdef ENABLE_EMULATOR_MONITOR
+	EmulatorMonitor *emulatormonitor;
+#endif
 };
 
 #ifdef ENABLE_VOSF
@@ -667,6 +679,9 @@ static driver_base *drv = NULL;	// Pointer to currently used driver object
 
 driver_base::driver_base(SDL_monitor_desc &m)
 	: monitor(m), mode(m.get_current_mode()), init_ok(false), s(NULL)
+#ifdef ENABLE_EMULATOR_MONITOR
+	, emulatormonitor(NULL)
+#endif
 {
 	the_buffer = NULL;
 	the_buffer_copy = NULL;
@@ -1218,10 +1233,23 @@ void driver_base::adapt_to_video_mode() {
 
 	// Everything went well
 	init_ok = true;
+#ifdef ENABLE_EMULATOR_MONITOR
+	if (emulatormonitor == NULL) {
+		emulatormonitor = new EmulatorMonitor();
+		if (!emulatormonitor->Start()) {
+			delete emulatormonitor;
+			emulatormonitor = NULL;
+		}
+	}
+#endif
 }
 
 driver_base::~driver_base()
 {
+#ifdef ENABLE_EMULATOR_MONITOR
+	delete emulatormonitor;
+	emulatormonitor = NULL;
+#endif
 	ungrab_mouse();
 	restore_mouse_accel();
 
@@ -2415,6 +2443,29 @@ static void handle_events(void)
 			SDL_Event & event = events[i];
 			
 			switch (event.type) {
+#ifdef ENABLE_EMULATOR_MONITOR
+			// Requests of the emulator monitor (its own registered event type)
+			default:
+				if (drv != NULL && drv->emulatormonitor != NULL) {
+					EmulatorMonitorView monitorview;
+					monitorview.framebuffer = the_buffer;
+					monitorview.palette = sdl_palette != NULL ? sdl_palette->colors : NULL;
+					monitorview.rowbytes = drv->VIDEO_MODE_ROW_BYTES;
+					monitorview.hostsurface = NULL;
+					monitorview.inputfunction = NULL;
+					monitorview.inputcontext = NULL;
+					monitorview.window = sdl_window;
+					monitorview.hostwidth = 0;
+					monitorview.hostheight = 0;
+					if (sdl_window != NULL)
+						SDL_GetWindowSize(sdl_window, &monitorview.hostwidth, &monitorview.hostheight);
+					monitorview.width = drv->VIDEO_MODE_X;
+					monitorview.height = drv->VIDEO_MODE_Y;
+					monitorview.depth = 1 << (drv->VIDEO_MODE_DEPTH & 0x0f);
+					drv->emulatormonitor->HandleEvent(event, monitorview);
+				}
+				break;
+#endif
 
 			// Mouse button
 			case SDL_MOUSEBUTTONDOWN: {
