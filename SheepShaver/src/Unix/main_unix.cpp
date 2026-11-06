@@ -1572,9 +1572,16 @@ static void *tick_func(void *arg)
 #endif
 
 		// Pseudo Mac 1Hz interrupt, update local time
+		// With MACEMU_GUEST_CLOCK set, the Mac's clock counts on from its
+		// own value (loaded from the host once at start), so a date set
+		// inside the Mac stays.
 		if (++tick_counter > 60) {
+			static const bool guest_clock = getenv("MACEMU_GUEST_CLOCK") != NULL;
 			tick_counter = 0;
-			WriteMacInt32(0x20c, TimerDateTime());
+			if (guest_clock)
+				WriteMacInt32(0x20c, ReadMacInt32(0x20c) + 1);
+			else
+				WriteMacInt32(0x20c, TimerDateTime());
 		}
 
 		// Trigger 60Hz interrupt

@@ -1306,8 +1306,14 @@ static void *xpram_func(void *arg)
 
 static void one_second(void)
 {
-	// Pseudo Mac 1Hz interrupt, update local time
-	WriteMacInt32(0x20c, TimerDateTime());
+	// Pseudo Mac 1Hz interrupt, update local time. With MACEMU_GUEST_CLOCK
+	// set, the Mac's clock counts on from its own value (loaded from the
+	// host once at start), so a date set inside the Mac stays.
+	static const bool guest_clock = getenv("MACEMU_GUEST_CLOCK") != NULL;
+	if (guest_clock)
+		WriteMacInt32(0x20c, ReadMacInt32(0x20c) + 1);
+	else
+		WriteMacInt32(0x20c, TimerDateTime());
 
 	SetInterruptFlag(INTFLAG_1HZ);
 	TriggerInterrupt();
