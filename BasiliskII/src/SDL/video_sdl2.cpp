@@ -777,6 +777,9 @@ static SDL_Surface *init_sdl_video(int width, int height, int depth, Uint32 flag
 	// SDL's offscreen driver (scripted runs) has neither Metal nor OpenGL: its software renderer.
 	const bool offscreen = SDL_GetCurrentVideoDriver() && !strcmp(SDL_GetCurrentVideoDriver(), "offscreen");
 	if (MetalIsAvailable() && !offscreen) window_flags |= SDL_WINDOW_METAL;
+	// Under sdl2-compat (SDL3) the offscreen driver gives a window OpenGL by
+	// default and fails without an EGL library: no graphics context at all.
+	if (offscreen) SDL_SetHint(SDL_HINT_VIDEO_EXTERNAL_CONTEXT, "1");
 #endif
 	
 	if (!sdl_window) {
