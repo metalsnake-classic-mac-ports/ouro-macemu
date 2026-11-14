@@ -11,7 +11,9 @@ Everything new is **off unless an environment variable switches it on**;
 only the three bug fixes are always active. Without those variables the
 emulators behave like kanjitalk755's. The branch is kept on top of
 kanjitalk755's `master` (rebased, not merged); `master` here follows
-upstream unchanged.
+upstream unchanged. Upstream commits needed before the next rebase are
+cherry-picked (`-x`) and drop out when `ouro` is rebased onto a `master`
+that has them.
 
 ## What is different from kanjitalk755/macemu
 
@@ -22,6 +24,12 @@ upstream unchanged.
 | SheepShaver `sysdeps.h`: a test-and-set and a release-store unlock for arm64 | arm64 had no `testandset`, so `spin_lock` did nothing: the CPU's `spcflags` and `InterruptFlags` were changed from two threads without a lock, and a lost update could end the PowerPC emulation silently in the middle of a game | [e-z-g `2abc99f0`](https://github.com/e-z-g/macemu/commit/2abc99f02eec6d90390c99ed62f15cb03f8b8876) |
 | Basilisk II `sysdeps.h`: the same | the same gap; the idle lock (`idlewait true`) and the VOSF lock did not lock on arm64 | this fork |
 | extfs `GetFileInfo` / `SetFileInfo` | wrote 28 bytes past the 80-byte `HFileParam` (fields that only exist in the larger `CInfoPBRec`); apps launched from the shared folder did not come to the front | [RandoOnSteam `9bc0c66f`](https://github.com/RandoOnSteam/PocketShaver/commit/9bc0c66f03f2708341b2b03da9166598e205adcd) |
+
+### Prefs
+
+| Pref | Effect | From |
+|---|---|---|
+| `singlemode true` | the SDL video driver offers the Mac only the screen size given in `screen` instead of every standard size up to it, so Mac OS cannot pick another one (it chose 1024x768 when 1920x1080 was one of several); pins the screen for scripted runs. Off by default | [e-z-g `4584883c`](https://github.com/e-z-g/macemu/commit/4584883c89177c5745e36d9e0de2c1d6650460e9) (SheepShaver); this fork: also a Basilisk II pref |
 
 ### Scripted and headless runs (switched by environment variables)
 

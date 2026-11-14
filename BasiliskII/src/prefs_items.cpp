@@ -54,6 +54,7 @@ prefs_desc common_prefs_items[] = {
 	{"bootdriver", TYPE_INT32, false, "boot driver number"},
 	{"ramsize", TYPE_INT32, false,    "size of Mac RAM in bytes"},
 	{"frameskip", TYPE_INT32, false,  "number of frames to skip in refreshed video modes"},
+	{"singlemode", TYPE_BOOLEAN, false, "offer the Mac only the screen size given"},
 	{"modelid", TYPE_INT32, false,    "Mac Model ID (Gestalt Model ID minus 6)"},
 	{"cpu", TYPE_INT32, false,        "CPU type (0 = 68000, 1 = 68010 etc.)"},
 	{"fpu", TYPE_BOOLEAN, false,      "enable FPU emulation"},
