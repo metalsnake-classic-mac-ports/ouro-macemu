@@ -33,6 +33,7 @@
 #include "audio.h"
 #include "audio_defs.h"
 #include "thunks.h"
+#include "rsrc_trace.h"
 
 #define DEBUG 0
 #include "debug.h"
@@ -661,6 +662,7 @@ void check_load_invoc(uint32 type, int16 id, uint32 h)
 	uint32 size = ReadMacInt32(p - 2 * 4) & 0xffffff;
 
 	CheckLoad(type, id, (uint16 *)Mac2HostAddr(p), size);
+	RsrcTraceLoad(type, h);
 }
 
 #ifdef __BEOS__
@@ -678,6 +680,7 @@ void named_check_load_invoc(uint32 type, uint32 name, uint32 h)
 	uint32 size = ReadMacInt32(p - 2 * 4) & 0xffffff;
 
 	CheckLoad(type, (char *)Mac2HostAddr(name), Mac2HostAddr(p), size);
+	RsrcTraceLoad(type, h);
 }
 
 #ifdef __BEOS__

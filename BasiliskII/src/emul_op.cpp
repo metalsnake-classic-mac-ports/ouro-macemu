@@ -41,6 +41,7 @@
 #include "ether.h"
 #include "extfs.h"
 #include "emul_op.h"
+#include "rsrc_trace.h"
 
 #ifdef ENABLE_MON
 #include "mon.h"
@@ -555,6 +556,7 @@ void EmulOp(uint16 opcode, M68kRegisters *r)
 			uint8 *p = Mac2HostAddr(adr);
 			uint32 size = ReadMacInt32(adr - 8) & 0xffffff;
 			CheckLoad(type, id, p, size);
+			RsrcTraceLoad(type, r->a[0]);
 			break;
 		}
 

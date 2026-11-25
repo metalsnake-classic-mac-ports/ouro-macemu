@@ -53,7 +53,8 @@ links:
 	@list='adb.cpp audio.cpp cdrom.cpp disk.cpp extfs.cpp pict.c \
 	       prefs.cpp scsi.cpp sony.cpp timer.cpp xpram.cpp \
 	       bincue.cpp include/bincue.h \
-	       include/adb.h include/audio.h include/audio_defs.h \
+	       include/adb.h include/audio.h \
+	       rsrc_trace.cpp include/rsrc_trace.h include/audio_defs.h \
 	       include/cdrom.h include/clip.h include/debug.h include/disk.h \
 	       include/extfs.h include/extfs_defs.h include/pict.h \
 	       include/prefs.h include/scsi.h include/serial.h include/prefs_editor.h \

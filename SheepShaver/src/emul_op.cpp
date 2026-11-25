@@ -42,6 +42,7 @@
 #include "macos_util.h"
 #include "rom_patches.h"
 #include "rsrc_patches.h"
+#include "rsrc_trace.h"
 #include "name_registry.h"
 #include "user_strings.h"
 #include "emul_op.h"
@@ -473,6 +474,7 @@ void EmulOp(M68kRegisters *r, uint32 pc, int selector)
 			uint16 *p = (uint16 *)Mac2HostAddr(adr);
 			uint32 size = ReadMacInt32(adr - 8) & 0xffffff;
 			CheckLoad(type, id, p, size);
+			RsrcTraceLoad(type, r->a[0]);
 			break;
 		}
 
