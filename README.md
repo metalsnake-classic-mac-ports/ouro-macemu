@@ -8,12 +8,13 @@ them from scripts: start without a window, click, type and take
 screenshots through a local socket, record the sound.
 
 Everything new is **off unless an environment variable switches it on**;
-only the three bug fixes are always active. Without those variables the
+only the bug fixes below are always active. Without those variables the
 emulators behave like kanjitalk755's. The branch is kept on top of
 kanjitalk755's `master` (rebased, not merged); `master` here follows
 upstream unchanged. Upstream commits needed before the next rebase are
 cherry-picked (`-x`) and drop out when `ouro` is rebased onto a `master`
-that has them.
+that has them. The extfs `GetFileInfo` fix taken from RandoOnSteam is
+upstream since [#330](https://github.com/kanjitalk755/macemu/pull/330).
 
 ## What is different from kanjitalk755/macemu
 
@@ -23,7 +24,7 @@ that has them.
 |---|---|---|
 | SheepShaver `sysdeps.h`: a test-and-set and a release-store unlock for arm64 | arm64 had no `testandset`, so `spin_lock` did nothing: the CPU's `spcflags` and `InterruptFlags` were changed from two threads without a lock, and a lost update could end the PowerPC emulation silently in the middle of a game | [e-z-g `2abc99f0`](https://github.com/e-z-g/macemu/commit/2abc99f02eec6d90390c99ed62f15cb03f8b8876) |
 | Basilisk II `sysdeps.h`: the same | the same gap; the idle lock (`idlewait true`) and the VOSF lock did not lock on arm64 | this fork |
-| extfs `GetFileInfo` / `SetFileInfo` | wrote 28 bytes past the 80-byte `HFileParam` (fields that only exist in the larger `CInfoPBRec`); apps launched from the shared folder did not come to the front | [RandoOnSteam `9bc0c66f`](https://github.com/RandoOnSteam/PocketShaver/commit/9bc0c66f03f2708341b2b03da9166598e205adcd) |
+| Mach timer (`timer.cpp`, `PRECISE_TIMING_MACH`, the path both emulators take on macOS) | the timer thread slept in `clock_sleep()` and was woken with `thread_abort()`; an abort that came after it had read the wake-up time but before it slept aborted nothing, so a Time Manager task primed meanwhile went overdue for seconds or for good. Now a condition variable under a mutex | [invariablyafk `c338b1ed`](https://github.com/invariablyafk/macemu/commit/c338b1edab90fa0355134ab71d7f20de9f1819c3) |
 
 ### Prefs
 
